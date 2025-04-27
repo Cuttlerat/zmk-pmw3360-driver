@@ -1,100 +1,84 @@
-PMW3610 driver implementation for ZMK with at least Zephyr 3.5
+# ZMK PMW3360 Driver
 
-This work is based on [ufan's implementation](https://github.com/ufan/zmk/tree/support-trackpad) of the driver.
+Этот репозиторий содержит драйвер для оптического сенсора PMW3360, часто используемого в компьютерных мышах. Драйвер разработан для использования с прошивкой ZMK.
 
-## Installation
+## Возможности
 
-Only GitHub actions builds are covered here. Local builds are different for each user, therefore it's not possible to cover all cases.
+- Поддержка оптического сенсора PMW3360
+- Настраиваемые параметры CPI/DPI
+- Режимы энергосбережения
+- Различные режимы ввода: перемещение, прокрутка и точный режим (snipe)
+- Настраиваемая частота опроса
 
-Include this project on your ZMK's west manifest in `config/west.yml`:
+## Использование
 
-```yml
+### Пример PMW3360
+
+Добавьте следующее в файл overlay устройства (board.overlay):
+
+```dts
+&spi1 {
+  status = "okay";
+    
+  cs-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+    
+  pmw3360: pmw3360@0 {
+    compatible = "pixart,pmw3360";
+    status = "okay";
+    reg = <0>;
+    spi-max-frequency = <2000000>;
+    irq-gpios = <&gpio0 10 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+    scroll-layers = <1>;
+    /* Вы можете добавить:
+    snipe-layers = <2>;  
+    */
+  };
+};
+```
+
+## Конфигурация
+
+Настройте параметры сенсора в файле `prj.conf` вашего проекта:
+
+```
+CONFIG_PMW3360=y
+CONFIG_PMW3360_CPI=1600
+CONFIG_PMW3360_SCROLL_CPI=800
+CONFIG_PMW3360_SNIPE_CPI=400
+```
+
+Смотрите файл `Kconfig.pmw3360` для всех доступных опций конфигурации.
+
+## Интеграция с ZMK
+
+Этот драйвер разработан для использования как модуль в ZMK. Добавьте его в ваш репозиторий конфигурации ZMK, включив его как подмодуль:
+
+```
+west config manifest.project-filter -- "+[^pmw3360]"
+git submodule add https://github.com/yourusername/zmk-pmw3360-driver.git modules/pmw3360-driver
+```
+
+Затем добавьте его в ваш манифест `west.yml`:
+
+```yaml
 manifest:
   remotes:
-    - name: zmkfirmware
-      url-base: https://github.com/petejohanson
-    - name: inorichi
-      url-base: https://github.com/inorichi
+    - name: zmk
+      url-base: https://github.com/zmkfirmware
+    - name: pmw3360-driver
+      url-base: https://github.com/yourusername
   projects:
     - name: zmk
-      remote: zmkfirmware
-      revision: feat/pointers-move-scroll
+      remote: zmk
+      revision: main
       import: app/west.yml
-    - name: zmk-pmw3610-driver
-      remote: inorichi
+    - name: pmw3360-driver
+      remote: pmw3360-driver
       revision: main
   self:
     path: config
 ```
 
-Then, edit your `build.yml` to look like this, 3.5 is now on main:
+## Лицензия
 
-```yml
-on: [workflow_dispatch]
-
-jobs:
-  build:
-    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@main
-```
-
-Now, update your `board.overlay` adding the necessary bits (update the pins for your board accordingly):
-
-```dts
-&pinctrl {
-    spi0_default: spi0_default {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
-                <NRF_PSEL(SPIM_MOSI, 0, 17)>,
-                <NRF_PSEL(SPIM_MISO, 0, 17)>;
-        };
-    };
-
-    spi0_sleep: spi0_sleep {
-        group1 {
-            psels = <NRF_PSEL(SPIM_SCK, 0, 8)>,
-                <NRF_PSEL(SPIM_MOSI, 0, 17)>,
-                <NRF_PSEL(SPIM_MISO, 0, 17)>;
-            low-power-enable;
-        };
-    };
-};
-
-&spi0 {
-    status = "okay";
-    compatible = "nordic,nrf-spim";
-    pinctrl-0 = <&spi0_default>;
-    pinctrl-1 = <&spi0_sleep>;
-    pinctrl-names = "default", "sleep";
-    cs-gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
-
-    trackball: trackball@0 {
-        status = "okay";
-        compatible = "pixart,pmw3610";
-        reg = <0>;
-        spi-max-frequency = <2000000>;
-        irq-gpios = <&gpio0 6 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
-
-        /*   optional features   */
-        // snipe-layers = <1>;
-        // scroll-layers = <2 3>;
-        // automouse-layer = <4>;
-    };
-};
-
-/ {
-  trackball_listener {
-    compatible = "zmk,input-listener";
-    device = <&trackball>;
-
-  };
-};
-```
-
-Now enable the driver config in your `board.config` file (read the Kconfig file to find out all possible options):
-
-```conf
-CONFIG_SPI=y
-CONFIG_INPUT=y
-CONFIG_ZMK_MOUSE=y
-CONFIG_PMW3610=y
-```
+Этот проект лицензирован под лицензией MIT - см. файл LICENSE для деталей.

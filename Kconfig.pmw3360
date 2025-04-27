@@ -1,0 +1,139 @@
+# Kconfig - PMW3360 mouse optical sensor
+#
+# Copyright (c) 2023 The ZMK Contributors
+#
+# SPDX-License-Identifier: MIT
+#
+
+menuconfig PMW3360
+    bool "PMW3360 mouse optical sensor"
+    select SPI
+    help
+      Enable PMW3360 mouse optical sensor.
+
+if PMW3360
+
+config PMW3360_CPI
+    int "PMW3360's default CPI"
+    default 1600
+    range 100 12000
+    help
+      Default CPI value, range from 100 to 12000
+
+config PMW3360_SCROLL_CPI
+    int "PMW3360's CPI in scroll mode"
+    default 800
+    range 100 12000
+    help
+      Scroll CPI value
+
+config PMW3360_SNIPE_CPI
+    int "PMW3360's CPI in snipe mode"
+    default 400
+    range 100 12000
+    help
+      Snipe CPI value
+
+config PMW3360_SCROLL_SMART_MODE
+    bool "Enable scroll smart mode"
+    default y
+    help
+      Enable smart scrolling algorithm that accumulates motion
+
+config PMW3360_SCROLL_ACCUMULATION_X
+    int "PMW3360's horizontal scroll accumulation threshold"
+    default 8
+    help
+      Horizontal accumulation threshold for scrolling
+
+config PMW3360_SCROLL_ACCUMULATION_Y
+    int "PMW3360's vertical scroll accumulation threshold"
+    default 8
+    help
+      Vertical accumulation threshold for scrolling
+
+choice
+    prompt "Select PMW3360's polling rate"
+    default PMW3360_POLLING_RATE_250
+
+config PMW3360_POLLING_RATE_250
+    bool "250 Hz"
+
+config PMW3360_POLLING_RATE_125
+    bool "125 Hz"
+
+config PMW3360_POLLING_RATE_125_SW
+    bool "125 Hz with software implementation"
+
+endchoice
+
+config PMW3360_FORCE_AWAKE
+    bool "PMW3360 forced awake mode"
+    help
+      This setting forces the sensor to always be in the RUN state.
+
+config PMW3360_RUN_DOWNSHIFT_TIME_MS
+    int "PMW3360's default RUN mode downshift time"
+    default 150
+    range 10 2550
+    help
+      Default RUN mode downshift down time in milliseconds.
+      Time after which sensor goes from RUN to REST1 mode.
+
+config PMW3360_REST1_DOWNSHIFT_TIME_MS
+    int "PMW3360's default REST1 mode downshift time"
+    default 500
+    range 10 2550
+    help
+      Default REST1 mode downshift down time in milliseconds.
+      Time after which sensor goes from REST1 to REST2 mode.
+
+config PMW3360_REST2_DOWNSHIFT_TIME_MS
+    int "PMW3360's default REST2 mode downshift time"
+    default 1000
+    range 10 2550
+    help
+      Default REST2 mode downshift down time in milliseconds.
+      Time after which sensor goes from REST2 to REST3 mode.
+
+config PMW3360_REST1_SAMPLE_TIME
+    int "PMW3360's REST1 sample time"
+    default 20
+    range 1 255
+    help
+      REST1 sample time in frames
+
+config PMW3360_REST2_SAMPLE_TIME
+    int "PMW3360's REST2 sample time"
+    default 40
+    range 1 255
+    help
+      REST2 sample time in frames
+
+config PMW3360_REST3_SAMPLE_TIME
+    int "PMW3360's REST3 sample time"
+    default 100
+    range 1 255
+    help
+      REST3 sample time in frames
+
+config PMW3360_LIFT_DETECTION_THRESHOLD
+    int "PMW3360's lift detection threshold"
+    default 0x02
+    range 0 0x7F
+    help
+      Threshold for lift detection. Lower values trigger lift detection more easily.
+
+config PMW3360_INVERT_SCROLL_X
+  bool "Invert the X axis of the scroll"
+  default n
+
+config PMW3360_INVERT_SCROLL_Y
+  bool "Invert the Y axis of the scroll"
+  default n
+
+module = PMW3360
+module-str = PMW3360
+source "${ZEPHYR_BASE}/subsys/logging/Kconfig.template.log_config"
+
+endif # PMW3360 
