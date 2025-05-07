@@ -17,12 +17,10 @@
 #include "pmw3360.h"
 
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_REGISTER(pmw3360, CONFIG_PMW3360_LOG_LEVEL);
 
-// Global counter for event tracking
-static atomic_t event_counter;
-
-/* SROM firmware meta-data, defined in pmw3360_piv.c */
+/* SROM firmware meta-data, defined in pmw3360_priv.c */
 extern const size_t pmw3360_firmware_length;
 extern const uint8_t pmw3360_firmware_data[];
 
@@ -538,10 +536,10 @@ static void irq_handler(const struct device *gpiob, struct gpio_callback *cb, ui
         k_panic();
     }
 
-    // If too many events are pending, drop some to prevent system overload
-    // but make sure we don't completely ignore movement
-    if (atomic_get(&event_counter) < 3) {
-        atomic_inc(&event_counter);
+#ifdef CONFIG_PMW3360_ENABLE_RATE_LIMITING
+    // Check if there's already a pending work item to avoid overloading
+    if (!k_work_is_pending(&data->trigger_work)) {
+        // Submit work for processing
         k_work_submit(&data->trigger_work);
     } else {
         // Re-enable interrupts if we're dropping this event
@@ -550,6 +548,10 @@ static void irq_handler(const struct device *gpiob, struct gpio_callback *cb, ui
             LOG_ERR("Cannot re-enable IRQ");
         }
     }
+#else
+    // Submit work for processing without rate limiting
+    k_work_submit(&data->trigger_work);
+#endif
 }
 
 static void set_interrupt(const struct device *dev, const bool en) {
@@ -597,14 +599,16 @@ static int pmw3360_report_data(const struct device *dev) {
         return -EBUSY;
     }
 
+#ifdef CONFIG_PMW3360_ENABLE_RATE_LIMITING
     // Limit event reporting rate to reduce system load
     static int64_t last_event_time;
     int64_t current_time = k_uptime_get();
-    if (current_time - last_event_time < 4) { // 250Hz max report rate
+    if (current_time - last_event_time < (1000 / CONFIG_PMW3360_MAX_REPORT_RATE_HZ)) {
         // Skip this event to prevent overloading the system
         return 0;
     }
     last_event_time = current_time;
+#endif
 
     int32_t dividor;
     enum pixart_input_mode input_mode = get_input_mode_for_current_layer(dev);
@@ -759,11 +763,10 @@ static void pmw3360_work_callback(struct k_work *work) {
 
     pmw3360_report_data(dev);
     
+#ifdef CONFIG_PMW3360_ENABLE_RATE_LIMITING
     // Add a small delay before re-enabling interrupts to prevent CPU overload
-    k_sleep(K_MSEC(2));
-    
-    // Decrement event counter when finishing processing
-    atomic_dec(&event_counter);
+    k_sleep(K_MSEC(1000 / CONFIG_PMW3360_MAX_REPORT_RATE_HZ / 2));
+#endif
     
     set_interrupt(dev, true);
 }
