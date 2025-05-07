@@ -634,8 +634,8 @@ static int pmw3360_report_data(const struct device *dev) {
     uint16_t y_raw = (uint16_t)((buf[PMW3360_DY_POS + 1] << 8) | buf[PMW3360_DY_POS]);
     
     // Cast to signed values to handle negative movement correctly
-    int16_t raw_x = (int16_t)x_raw / dividor;
-    int16_t raw_y = (int16_t)y_raw / dividor;
+    int16_t raw_x = (int16_t)x_raw / 1;
+    int16_t raw_y = (int16_t)y_raw / 1;
     
     int16_t x;
     int16_t y;
