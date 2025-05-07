@@ -19,6 +19,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(pmw3360, CONFIG_PMW3360_LOG_LEVEL);
 
+// Global counter for event tracking
+static atomic_t event_counter;
 
 /* SROM firmware meta-data, defined in pmw3360_piv.c */
 extern const size_t pmw3360_firmware_length;
@@ -536,9 +538,6 @@ static void irq_handler(const struct device *gpiob, struct gpio_callback *cb, ui
         k_panic();
     }
 
-    // Using atomic operations to track event count
-    static atomic_t event_counter;
-    
     // If too many events are pending, drop some to prevent system overload
     // but make sure we don't completely ignore movement
     if (atomic_get(&event_counter) < 3) {
@@ -601,7 +600,7 @@ static int pmw3360_report_data(const struct device *dev) {
     // Limit event reporting rate to reduce system load
     static int64_t last_event_time;
     int64_t current_time = k_uptime_get();
-    if (current_time - last_event_time < 4) { // 250Hz report rate
+    if (current_time - last_event_time < 4) { // 250Hz max report rate
         // Skip this event to prevent overloading the system
         return 0;
     }
