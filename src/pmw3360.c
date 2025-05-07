@@ -529,16 +529,28 @@ static void irq_handler(const struct device *gpiob, struct gpio_callback *cb, ui
     const struct device *dev = data->dev;
     const struct pixart_config *config = dev->config;
 
-//    LOG_INF("In irq handler");
-    // disable the interrupt line first
+    // Disable the interrupt line first
     err = gpio_pin_interrupt_configure_dt(&config->irq_gpio, GPIO_INT_DISABLE);
     if (unlikely(err)) {
         LOG_ERR("Cannot disable IRQ");
         k_panic();
     }
 
-    // submit the real handler work
-    k_work_submit(&data->trigger_work);
+    // Using atomic operations to track event count
+    static atomic_t event_counter;
+    
+    // If too many events are pending, drop some to prevent system overload
+    // but make sure we don't completely ignore movement
+    if (atomic_get(&event_counter) < 3) {
+        atomic_inc(&event_counter);
+        k_work_submit(&data->trigger_work);
+    } else {
+        // Re-enable interrupts if we're dropping this event
+        err = gpio_pin_interrupt_configure_dt(&config->irq_gpio, GPIO_INT_LEVEL_ACTIVE);
+        if (unlikely(err)) {
+            LOG_ERR("Cannot re-enable IRQ");
+        }
+    }
 }
 
 static void set_interrupt(const struct device *dev, const bool en) {
@@ -585,6 +597,15 @@ static int pmw3360_report_data(const struct device *dev) {
         LOG_WRN("Device is not initialized yet");
         return -EBUSY;
     }
+
+    // Limit event reporting rate to reduce system load
+    static int64_t last_event_time;
+    int64_t current_time = k_uptime_get();
+    if (current_time - last_event_time < 4) { // 250Hz report rate
+        // Skip this event to prevent overloading the system
+        return 0;
+    }
+    last_event_time = current_time;
 
     int32_t dividor;
     enum pixart_input_mode input_mode = get_input_mode_for_current_layer(dev);
@@ -734,11 +755,17 @@ static void pmw3360_gpio_callback(const struct device *gpiob, struct gpio_callba
 }
 
 static void pmw3360_work_callback(struct k_work *work) {
-//    LOG_INF("In pwm3360_work_callback");
     struct pixart_data *data = CONTAINER_OF(work, struct pixart_data, trigger_work);
     const struct device *dev = data->dev;
 
     pmw3360_report_data(dev);
+    
+    // Add a small delay before re-enabling interrupts to prevent CPU overload
+    k_sleep(K_MSEC(2));
+    
+    // Decrement event counter when finishing processing
+    atomic_dec(&event_counter);
+    
     set_interrupt(dev, true);
 }
 
