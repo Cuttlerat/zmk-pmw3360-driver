@@ -76,12 +76,12 @@ config PMW3360_ENABLE_RATE_LIMITING
 config PMW3360_MAX_REPORT_RATE_HZ
 	int "Maximum report rate in Hz"
 	default 250
-	range 50 1000
+	range 50 250
 	depends on PMW3360_ENABLE_RATE_LIMITING
 	help
 	  Maximum allowed report rate in Hz (events per second).
 	  Higher values provide smoother tracking but increase system load.
-	  Common values: 125, 250, 500, 1000.
+	  Common values: 125, 250.
 
 choice
 	prompt "Select PMW3360 sensor orientation"
